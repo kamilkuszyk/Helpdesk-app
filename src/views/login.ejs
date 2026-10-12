@@ -1,0 +1,10 @@
+<%- include('partials/header') %>
+<h2>Logowanie</h2>
+<% if (error) { %><p class="error"><%= error %></p><% } %>
+<form method="post" action="/login">
+    <p>Login: <input name="username" value="<%= username %>" required autofocus></p>
+    <p>Hasło: <input name="password" type="password" required></p>
+    <button>Zaloguj</button>
+</form>
+<p>Nie masz konta? <a href="/register">Zarejestruj się</a></p>
+<%- include('partials/footer') %>

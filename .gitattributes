@@ -1,0 +1,5 @@
+# Wszystkie pliki tekstowe z końcówkami linii LF (Unix) - także na Windowsie.
+# Bez tego skrypty i pliki dla Dockera mogą się psuć po edycji na Windowsie.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

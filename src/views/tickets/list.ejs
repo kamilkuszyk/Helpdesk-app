@@ -1,0 +1,35 @@
+<%- include('../partials/header') %>
+<h2><%= user.role === 'user' ? 'Moje zgłoszenia' : 'Wszystkie zgłoszenia' %></h2>
+
+<form method="get" action="/tickets">
+    Szukaj: <input name="q" value="<%= q %>">
+    Status:
+    <select name="status">
+        <option value="">(wszystkie)</option>
+        <% STATUSES.forEach(s => { %>
+            <option value="<%= s %>" <%= s === status ? 'selected' : '' %>><%= LABELS[s] %></option>
+        <% }) %>
+    </select>
+    <button>Filtruj</button>
+</form>
+<br>
+
+<% if (tickets.length === 0) { %>
+    <p>Brak zgłoszeń.</p>
+<% } else { %>
+<table>
+    <tr><th>#</th><th>Tytuł</th><th>Status</th><th>Priorytet</th><th>Autor</th><th>Przypisany</th><th>Aktualizacja</th></tr>
+    <% tickets.forEach(t => { %>
+    <tr>
+        <td><%= t.id %></td>
+        <td><a href="/tickets/<%= t.id %>"><%= t.title %></a></td>
+        <td><%= LABELS[t.status] %></td>
+        <td><%= LABELS[t.priority] %></td>
+        <td><%= t.author_name %></td>
+        <td><%= t.assignee_name || '-' %></td>
+        <td><%= t.updated_at.toLocaleString('pl-PL') %></td>
+    </tr>
+    <% }) %>
+</table>
+<% } %>
+<%- include('../partials/footer') %>

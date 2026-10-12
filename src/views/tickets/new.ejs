@@ -1,0 +1,16 @@
+<%- include('../partials/header') %>
+<h2>Nowe zgłoszenie</h2>
+<% if (error) { %><p class="error"><%= error %></p><% } %>
+<form method="post" action="/tickets">
+    <p>Tytuł:<br><input name="title" size="60" maxlength="200" value="<%= form.title || '' %>" required></p>
+    <p>Opis problemu:<br><textarea name="description" rows="8" maxlength="5000" required><%= form.description || '' %></textarea></p>
+    <p>Priorytet:
+        <select name="priority">
+            <% PRIORITIES.forEach(p => { %>
+                <option value="<%= p %>" <%= p === (form.priority || 'medium') ? 'selected' : '' %>><%= LABELS[p] %></option>
+            <% }) %>
+        </select>
+    </p>
+    <button>Wyślij zgłoszenie</button>
+</form>
+<%- include('../partials/footer') %>

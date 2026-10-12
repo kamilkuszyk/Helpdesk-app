@@ -1,0 +1,29 @@
+<%- include('../partials/header') %>
+<h2>Użytkownicy</h2>
+<table>
+    <tr><th>#</th><th>Login</th><th>Zgłoszeń</th><th>Utworzono</th><th>Rola / aktywny</th></tr>
+    <% users.forEach(u => { %>
+    <tr>
+        <td><%= u.id %></td>
+        <td><%= u.username %></td>
+        <td><%= u.ticket_count %></td>
+        <td><%= u.created_at.toLocaleDateString('pl-PL') %></td>
+        <td>
+            <% if (u.id === user.id) { %>
+                <%= LABELS[u.role] %> (Twoje konto)
+            <% } else { %>
+            <form method="post" action="/admin/users/<%= u.id %>">
+                <select name="role">
+                    <% ROLES.forEach(r => { %>
+                        <option value="<%= r %>" <%= r === u.role ? 'selected' : '' %>><%= LABELS[r] %></option>
+                    <% }) %>
+                </select>
+                <label><input type="checkbox" name="is_active" <%= u.is_active ? 'checked' : '' %>> aktywny</label>
+                <button>Zapisz</button>
+            </form>
+            <% } %>
+        </td>
+    </tr>
+    <% }) %>
+</table>
+<%- include('../partials/footer') %>

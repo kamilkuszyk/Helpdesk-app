@@ -1,0 +1,57 @@
+<%- include('../partials/header') %>
+<h2>#<%= ticket.id %>: <%= ticket.title %></h2>
+<p>
+    Status: <strong><%= LABELS[ticket.status] %></strong> |
+    Priorytet: <strong><%= LABELS[ticket.priority] %></strong> |
+    Autor: <%= ticket.author_name %> |
+    Przypisany: <%= ticket.assignee_name || '-' %> |
+    Utworzono: <%= ticket.created_at.toLocaleString('pl-PL') %>
+</p>
+<%# Znacznik EJS ze znakiem "=" zamienia znaki specjalne HTML na encje (ochrona przed XSS) %>
+<p style="white-space: pre-wrap"><%= ticket.description %></p>
+
+<% if (user.role !== 'user') { %>
+<fieldset>
+    <legend>Obsługa zgłoszenia (support)</legend>
+    <form method="post" action="/tickets/<%= ticket.id %>/update">
+        Status:
+        <select name="status">
+            <% STATUSES.forEach(s => { %>
+                <option value="<%= s %>" <%= s === ticket.status ? 'selected' : '' %>><%= LABELS[s] %></option>
+            <% }) %>
+        </select>
+        Priorytet:
+        <select name="priority">
+            <% PRIORITIES.forEach(p => { %>
+                <option value="<%= p %>" <%= p === ticket.priority ? 'selected' : '' %>><%= LABELS[p] %></option>
+            <% }) %>
+        </select>
+        Przypisz do:
+        <select name="assignee_id">
+            <option value="">(nikt)</option>
+            <% staff.forEach(s => { %>
+                <option value="<%= s.id %>" <%= s.id === ticket.assignee_id ? 'selected' : '' %>><%= s.username %></option>
+            <% }) %>
+        </select>
+        <button>Zapisz</button>
+    </form>
+</fieldset>
+<% } %>
+
+<h3>Komentarze (<%= comments.length %>)</h3>
+<% comments.forEach(c => { %>
+    <div class="comment">
+        <small><strong><%= c.username %></strong> (<%= LABELS[c.role] %>), <%= c.created_at.toLocaleString('pl-PL') %></small>
+        <div style="white-space: pre-wrap"><%= c.body %></div>
+    </div>
+<% }) %>
+
+<% if (ticket.status !== 'closed') { %>
+<form method="post" action="/tickets/<%= ticket.id %>/comments">
+    <p><textarea name="body" rows="4" maxlength="2000" required></textarea></p>
+    <button>Dodaj komentarz</button>
+</form>
+<% } else { %>
+<p><em>Zgłoszenie zamknięte - komentowanie wyłączone.</em></p>
+<% } %>
+<%- include('../partials/footer') %>

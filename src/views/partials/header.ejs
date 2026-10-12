@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <title>Helpdesk</title>
+    <style>
+        body { font-family: sans-serif; max-width: 900px; margin: 20px auto; padding: 0 10px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+        .flash { background: #ffd; border: 1px solid #cc9; padding: 6px; }
+        .error { color: #b00; }
+        .comment { border-left: 3px solid #999; padding-left: 8px; margin: 8px 0; }
+        textarea { width: 100%; }
+    </style>
+</head>
+<body>
+<nav>
+    <strong>Helpdesk</strong> |
+    <% if (locals.user) { %>
+        <a href="/tickets">Zgłoszenia</a> |
+        <a href="/tickets/new">Nowe zgłoszenie</a> |
+        <% if (user.role === 'admin') { %><a href="/admin/users">Użytkownicy</a> |<% } %>
+        Zalogowany: <%= user.username %> (<%= LABELS[user.role] %>)
+        <form method="post" action="/logout" style="display:inline"><button>Wyloguj</button></form>
+    <% } else { %>
+        <a href="/login">Logowanie</a> | <a href="/register">Rejestracja</a>
+    <% } %>
+</nav>
+<hr>
+<% if (locals.flash) { %><p class="flash"><%= flash %></p><% } %>

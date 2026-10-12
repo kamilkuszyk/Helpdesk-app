@@ -1,0 +1,10 @@
+<%- include('partials/header') %>
+<h2>Rejestracja</h2>
+<% if (error) { %><p class="error"><%= error %></p><% } %>
+<form method="post" action="/register">
+    <p>Login: <input name="username" value="<%= username %>" required></p>
+    <p>Hasło (min. 8 znaków): <input name="password" type="password" required></p>
+    <p>Powtórz hasło: <input name="password2" type="password" required></p>
+    <button>Utwórz konto</button>
+</form>
+<%- include('partials/footer') %>
