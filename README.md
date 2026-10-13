@@ -100,11 +100,3 @@ Dockerfile, docker-compose.yml
   sesje w bazie (działają przy wielu instancjach), blokada konta przez admina działa natychmiast.
 - Brak nagłówka `X-Powered-By`, ogólne komunikaty błędów (szczegóły tylko w logach).
 - Kontener działa jako użytkownik `node` (nie root).
-
-## 7. Do zrobienia na kolejnych laboratoriach
-
-- **L3/L4:** `TRUST_PROXY=1`, `COOKIE_SECURE=true`, `DB_SSL=true`, `SEED_DEMO_DATA=false` w chmurze; TLS na load balancerze.
-- **L5/L6:** GitHub Actions: build, `npm audit`, SAST (np. Semgrep/CodeQL), skan obrazu (Trivy), DAST (OWASP ZAP), sekrety w GitHub Secrets.
-- **L7:** nagłówki bezpieczeństwa (`helmet`: CSP, HSTS…), tokeny CSRF, limit prób logowania (rate limiting),
-  wygasanie sesji przy bezczynności, lista aktywnych sesji / dziennik zdarzeń bezpieczeństwa (monitoring sesji), WAF/CDN.
-- **L8/L9:** hardening (CIS/STIG), testy ZAP/Nikto/sqlmap, skan infrastruktury.
