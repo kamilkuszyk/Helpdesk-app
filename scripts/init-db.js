@@ -11,12 +11,15 @@ const { pool } = require('../src/db');
 const LOCK_ID = 727001;
 
 async function seed(client) {
-    // Konta testowe TYLKO dla środowiska DEV
+    // Konta testowe. Na DEV mają proste hasła z README.
+    // W chmurze ustawiamy DEMO_PASSWORD - wtedy wszystkie konta testowe
+    // dostają to jedno, silne hasło (znane tylko zespołowi).
+    const demo = process.env.DEMO_PASSWORD;
     const users = [
-        ['admin', 'Admin123!', 'admin'],
-        ['support', 'Support123!', 'support'],
-        ['jan', 'User123!', 'user'],
-        ['anna', 'User123!', 'user'],
+        ['admin', demo || 'Admin123!', 'admin'],
+        ['support', demo || 'Support123!', 'support'],
+        ['jan', demo || 'User123!', 'user'],
+        ['anna', demo || 'User123!', 'user'],
     ];
     const ids = {};
     for (const [username, password, role] of users) {
