@@ -1,9 +1,34 @@
 #!/usr/bin/env zsh
 # =====================================================================
-# Helpdesk - wdrożenie infrastruktury w Azure (L4)
-# Uruchamiane krok po kroku w Terminalu (zsh, macOS) po `az login`.
-# Hasła NIE są zapisane w pliku - skrypt pyta o nie interaktywnie.
+# Helpdesk - infrastruktura w Microsoft Azure (Azure for Students)
 # =====================================================================
+#
+# USTAWIENIA SRODOWISKA (to samo mozna wyklikac w portalu Azure):
+#
+# 1. Grupa zasobow:      rg-helpdesk (Poland Central)
+# 2. Rejestr obrazow:    acrhelpdeskkk, plan Standard, Poland Central,
+#                        zakres nazwy domeny: ponowne uzycie dzierzawy
+# 3. Siec wirtualna:     vnet-helpdesk-no (Norway East), 10.0.0.0/16
+#                        - snet-apps: 10.0.0.0/23, delegowana do Microsoft.App/environments
+#                        - snet-db:   10.0.2.0/24
+# 4. Baza PostgreSQL:    psql-helpdesk-no (Norway East), wersja 16,
+#                        Burstable B1ms, 32 GiB, bez wysokiej dostepnosci,
+#                        dostep publiczny wylaczony, baza "helpdesk"
+# 5. Private Endpoint:   pe-psql-helpdesk w snet-db (adres prywatny bazy),
+#                        prywatna strefa DNS privatelink.postgres.database.azure.com
+# 6. Firewall (NSG):     nsg-snet-db na snet-db - wpuszcza tylko TCP 5432
+#                        z 10.0.0.0/23 (snet-apps), reszta zablokowana
+# 7. Container Apps:     srodowisko cae-helpdesk w snet-apps,
+#                        aplikacja ca-helpdesk: ingress zewnetrzny (HTTPS), port 3000,
+#                        0,25 vCPU / 0,5 GiB, autoskalowanie 1-3 repliki (HTTP, 10 zadan)
+# 8. Sekrety aplikacji:  DATABASE_URL, SESSION_SECRET, DEMO_PASSWORD
+#    Zmienne:            DB_SSL=true, COOKIE_SECURE=true, TRUST_PROXY=1
+# 9. Uprawnienia:        tozsamosc aplikacji z rola AcrPull na rejestrze
+#
+# PONIZEJ: te same ustawienia jako komendy Azure CLI (uruchamiane po `az login`).
+# Hasla nie sa zapisane w pliku - skrypt pyta o nie przy uruchomieniu.
+# =====================================================================
+
 set -e
 
 RG=rg-helpdesk
