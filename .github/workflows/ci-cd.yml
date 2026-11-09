@@ -1,0 +1,82 @@
+# CI/CD aplikacji Helpdesk
+# - przy każdym push i pull requeście: testy + budowa obrazu (CI)
+# - po push na main: wysłanie obrazu do ACR i wdrożenie na Azure Container Apps (CD)
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # potrzebne do logowania do Azure przez OIDC (bez haseł)
+
+env:
+  ACR_NAME: acrhelpdeskkk
+  RESOURCE_GROUP: rg-helpdesk
+  APP_NAME: ca-helpdesk
+
+jobs:
+  ci:
+    name: Testy i budowa obrazu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalacja zależności
+        run: npm ci
+
+      - name: Sprawdzenie składni kodu
+        run: for f in $(git ls-files '*.js'); do node --check "$f"; done
+
+      - name: Skan zależności (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Testowa budowa obrazu Docker
+        run: docker build -t helpdesk:test .
+
+  cd:
+    name: Wdrożenie na Azure
+    needs: ci
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Logowanie do Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Budowa i wysłanie obrazu do ACR
+        run: |
+          az acr login --name $ACR_NAME
+          ACR=$(az acr show --name $ACR_NAME --query loginServer -o tsv)
+          IMAGE=$ACR/helpdesk:${{ github.sha }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Wdrożenie nowej wersji
+        run: |
+          az extension add --name containerapp --upgrade -y
+          az containerapp update -g $RESOURCE_GROUP -n $APP_NAME --image $IMAGE
+
+      - name: Test po wdrożeniu (/health)
+        run: |
+          FQDN=$(az containerapp show -g $RESOURCE_GROUP -n $APP_NAME --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 18); do
+            if curl -fsS "https://$FQDN/health"; then echo; echo "Wdrożenie OK"; exit 0; fi
+            sleep 10
+          done
+          echo "Aplikacja nie odpowiada po wdrożeniu"; exit 1
