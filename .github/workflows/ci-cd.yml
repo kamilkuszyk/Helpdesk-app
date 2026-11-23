@@ -1,6 +1,13 @@
-# CI/CD aplikacji Helpdesk
-# - przy każdym push i pull requeście: testy + budowa obrazu (CI)
-# - po push na main: wysłanie obrazu do ACR i wdrożenie na Azure Container Apps (CD)
+# CI/CD aplikacji Helpdesk z kontrolami bezpieczeństwa (L5 + L6)
+#
+#   ci   (każdy push i PR): testy, skan zależności, skan sekretów, budowa i skan obrazu
+#   sast (każdy push i PR): analiza statyczna kodu (CodeQL)
+#   cd   (push na main, gdy ci i sast przejdą): wdrożenie na Azure + test /health
+#   dast (po wdrożeniu): pasywny skan działającej aplikacji (OWASP ZAP)
+#
+# Akcje są przypięte do pełnego SHA commita, a nie do tagu (np. @v4).
+# Tag można przestawić na złośliwy kod (tak było w ataku na trivy-action w 2026),
+# a SHA wskazuje zawsze ten sam, sprawdzony kod. Aktualizacje proponuje Dependabot.
 name: CI/CD
 
 on:
@@ -10,23 +17,32 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Domyślnie tylko odczyt repozytorium. Każdy job dostaje więcej tylko wtedy, gdy musi.
 permissions:
   contents: read
-  id-token: write   # potrzebne do logowania do Azure przez OIDC (bez haseł)
 
 env:
   ACR_NAME: acrhelpdeskkk
   RESOURCE_GROUP: rg-helpdesk
   APP_NAME: ca-helpdesk
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 
 jobs:
   ci:
-    name: Testy i budowa obrazu
+    name: Testy i skany bezpieczeństwa
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write   # wyniki skanu obrazu trafiają do zakładki Security
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0              # pełna historia - gitleaks sprawdza wszystkie commity
+          persist-credentials: false  # token GitHuba nie zostaje na dysku runnera
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -40,19 +56,77 @@ jobs:
       - name: Skan zależności (npm audit)
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Testowa budowa obrazu Docker
+      - name: Skan sekretów w całej historii (gitleaks)
+        run: |
+          curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -   # weryfikacja, że narzędzie nie zostało podmienione
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks git . --redact -v --no-banner
+
+      - name: Budowa obrazu Docker
         run: docker build -t helpdesk:test .
+
+      - name: Skan obrazu (Grype)
+        id: grype
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: helpdesk:test
+          fail-build: true        # podatność HIGH/CRITICAL z dostępną poprawką blokuje wdrożenie
+          severity-cutoff: high
+          only-fixed: true
+          output-format: sarif
+
+      - name: Wyniki skanu obrazu do zakładki Security
+        if: always() && steps.grype.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: ${{ steps.grype.outputs.sarif }}
+          category: grype
+
+  sast:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write   # wyniki analizy trafiają do zakładki Security
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+
+      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          category: /language:javascript-typescript
 
   cd:
     name: Wdrożenie na Azure
-    needs: ci
+    needs: [ci, sast]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: produkcja           # nigdy dwa wdrożenia naraz
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write            # tylko ten job może zalogować się do Azure (OIDC, bez haseł)
+    outputs:
+      fqdn: ${{ steps.health.outputs.fqdn }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Logowanie do Azure (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -73,10 +147,28 @@ jobs:
           az containerapp update -g $RESOURCE_GROUP -n $APP_NAME --image $IMAGE
 
       - name: Test po wdrożeniu (/health)
+        id: health
         run: |
           FQDN=$(az containerapp show -g $RESOURCE_GROUP -n $APP_NAME --query properties.configuration.ingress.fqdn -o tsv)
+          echo "fqdn=$FQDN" >> $GITHUB_OUTPUT
           for i in $(seq 1 18); do
             if curl -fsS "https://$FQDN/health"; then echo; echo "Wdrożenie OK"; exit 0; fi
             sleep 10
           done
           echo "Aplikacja nie odpowiada po wdrożeniu"; exit 1
+
+  dast:
+    name: DAST (OWASP ZAP)
+    needs: cd
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Pasywny skan działającej aplikacji
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: https://${{ needs.cd.outputs.fqdn }}
+          allow_issue_writing: false   # raport jako plik do pobrania, bez zakładania zgłoszeń
+          fail_action: false           # na razie tylko raport - poprawki na L7
+          artifact_name: raport-zap

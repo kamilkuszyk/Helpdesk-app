@@ -1,0 +1,19 @@
+# Dependabot co tydzień sprawdza, czy są nowsze (bezpieczniejsze) wersje
+# i sam otwiera pull requesty z aktualizacją. Każdy taki PR przechodzi przez CI.
+version: 2
+updates:
+  - package-ecosystem: npm            # biblioteki Node.js (package.json)
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker         # obraz bazowy w Dockerfile (node:22-alpine)
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions # akcje w pipeline (przypięte SHA)
+    directory: /
+    schedule:
+      interval: weekly
