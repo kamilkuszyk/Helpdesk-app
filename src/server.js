@@ -8,7 +8,7 @@ const { pool } = require('./db');
 const { loadUser } = require('./auth');
 const {
     SESSION_COOKIE, COOKIE_OPTIONS, IDLE_TIMEOUT_MS,
-    securityHeaders, extraHeaders, globalLimiter, csrfProtection,
+    securityHeaders, extraHeaders, globalLimiter, healthLimiter, csrfProtection,
 } = require('./security');
 
 if (!process.env.SESSION_SECRET) {
@@ -39,8 +39,8 @@ app.use(securityHeaders);
 app.use(express.static(path.join(__dirname, 'public'), { index: false, maxAge: '1h' }));
 app.use(extraHeaders);
 
-// --- Healthcheck dla load balancera / Dockera (bez limitów i bez sesji) ---
-app.get('/health', async (req, res) => {
+// --- Healthcheck dla load balancera / Dockera (własny limit, bez sesji) ---
+app.get('/health', healthLimiter, async (req, res) => {
     try {
         await pool.query('SELECT 1');
         res.json({ status: 'ok' });

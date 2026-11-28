@@ -81,6 +81,15 @@ const globalLimiter = rateLimit({
     handler: tooManyRequests('global'),
 });
 
+// /health: osobny, łagodny limit - sondy load balancera odpytują go regularnie,
+// ale bez limitu ktoś mógłby zalewać bazę zapytaniami "SELECT 1"
+const healthLimiter = rateLimit({
+    ...common,
+    windowMs: 60 * 1000,
+    limit: 60,
+    handler: (req, res) => res.status(429).json({ status: 'too_many_requests' }),
+});
+
 // logowanie: max 10 NIEUDANYCH prób na 15 min z jednego IP
 const loginLimiter = rateLimit({
     ...common,
@@ -129,6 +138,6 @@ function csrfProtection(req, res, next) {
 module.exports = {
     SESSION_COOKIE, COOKIE_OPTIONS, IDLE_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS,
     securityHeaders, extraHeaders,
-    globalLimiter, loginLimiter, registerLimiter,
+    globalLimiter, healthLimiter, loginLimiter, registerLimiter,
     csrfProtection,
 };
