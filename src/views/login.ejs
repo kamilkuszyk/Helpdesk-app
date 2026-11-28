@@ -2,8 +2,9 @@
 <h2>Logowanie</h2>
 <% if (error) { %><p class="error"><%= error %></p><% } %>
 <form method="post" action="/login">
-    <p>Login: <input name="username" value="<%= username %>" required autofocus></p>
-    <p>Hasło: <input name="password" type="password" required></p>
+    <%- include('partials/csrf') %>
+    <p>Login: <input name="username" value="<%= username %>" maxlength="50" required autofocus></p>
+    <p>Hasło: <input name="password" type="password" autocomplete="current-password" required></p>
     <button>Zaloguj</button>
 </form>
 <p>Nie masz konta? <a href="/register">Zarejestruj się</a></p>

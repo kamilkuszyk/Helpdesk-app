@@ -6,6 +6,10 @@ const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const { pool } = require('./db');
 const { loadUser } = require('./auth');
+const {
+    SESSION_COOKIE, COOKIE_OPTIONS, IDLE_TIMEOUT_MS,
+    securityHeaders, extraHeaders, globalLimiter, csrfProtection,
+} = require('./security');
 
 if (!process.env.SESSION_SECRET) {
     console.error('Brak SESSION_SECRET w zmiennych środowiskowych.');
@@ -25,36 +29,17 @@ app.locals.LABELS = {
 };
 
 // Za load balancerem (L3/L4) HTTPS kończy się na LB, a do aplikacji idzie HTTP.
-// TRUST_PROXY=1 każe ufać nagłówkom X-Forwarded-* od LB (np. dla secure cookie).
+// TRUST_PROXY=1 każe ufać nagłówkom X-Forwarded-* od LB (prawdziwe IP klienta, secure cookie).
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
 
-app.use(express.urlencoded({ extended: false })); // dane z formularzy HTML
+// --- Nagłówki bezpieczeństwa (CSP, HSTS, clickjacking...) ---
+app.use(securityHeaders);
 
-// --- Sesja ---
-app.use(session({
-    store: new PgSession({ pool, tableName: 'session' }), // sesje w PostgreSQL
-    name: 'helpdesk.sid',
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,        // nie tworzymy sesji dla niezalogowanych
-    cookie: {
-        httpOnly: true,               // JavaScript w przeglądarce nie odczyta ciasteczka
-        sameSite: 'lax',
-        secure: process.env.COOKIE_SECURE === 'true', // true gdy działa HTTPS
-        maxAge: 2 * 60 * 60 * 1000,   // 2 godziny
-    },
-}));
+// Pliki statyczne (style.css) - przed sesją, żeby nie obciążać bazy
+app.use(express.static(path.join(__dirname, 'public'), { index: false, maxAge: '1h' }));
+app.use(extraHeaders);
 
-app.use(loadUser);
-
-// Jednorazowe komunikaty ("flash") po przekierowaniu
-app.use((req, res, next) => {
-    res.locals.flash = req.session.flash || null;
-    if (req.session.flash) delete req.session.flash;
-    next();
-});
-
-// --- Healthcheck dla load balancera / Dockera ---
+// --- Healthcheck dla load balancera / Dockera (bez limitów i bez sesji) ---
 app.get('/health', async (req, res) => {
     try {
         await pool.query('SELECT 1');
@@ -64,9 +49,37 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// --- Limit żądań dla całej aplikacji ---
+app.use(globalLimiter);
+
+// dane z formularzy HTML (z limitem rozmiaru)
+app.use(express.urlencoded({ extended: false, limit: '20kb' }));
+
+// --- Sesja ---
+app.use(session({
+    store: new PgSession({ pool, tableName: 'session' }), // sesje w PostgreSQL
+    name: SESSION_COOKIE,
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false, // nie tworzymy sesji dla niezalogowanych
+    rolling: true,            // każda aktywność przedłuża sesję -> wygasa po bezczynności
+    cookie: { ...COOKIE_OPTIONS, maxAge: IDLE_TIMEOUT_MS },
+}));
+
+app.use(loadUser);
+app.use(csrfProtection);
+
+// Jednorazowe komunikaty ("flash") po przekierowaniu
+app.use((req, res, next) => {
+    res.locals.flash = req.session.flash || null;
+    if (req.session.flash) delete req.session.flash;
+    next();
+});
+
 // --- Trasy ---
 app.get('/', (req, res) => res.redirect(req.user ? '/tickets' : '/login'));
 app.use('/', require('./routes/auth'));
+app.use('/account', require('./routes/account'));
 app.use('/tickets', require('./routes/tickets'));
 app.use('/admin', require('./routes/admin'));
 

@@ -89,14 +89,24 @@ Dockerfile, docker-compose.yml
 | POST | `/tickets/:id/update` | status/priorytet/przypisanie (support, admin) |
 | GET/POST | `/admin/users`, `/admin/users/:id` | panel admina |
 
-## 6. Co już jest zabezpieczone (bazowo)
+## 6. Zabezpieczenia
 
-- Hasła: bcrypt (koszt 12), minimum 8 znaków; ten sam komunikat dla złego loginu i hasła.
+**Bazowe (L1–L2)**
+- Hasła: bcrypt (koszt 12); ten sam komunikat dla złego loginu, hasła i zablokowanego konta.
 - Zapytania SQL wyłącznie parametryzowane (`$1, $2…`) – brak SQL injection.
 - Szablony EJS `<%= %>` escapują HTML – brak stored XSS w tytułach i komentarzach.
 - Kontrola dostępu po stronie serwera dla każdego zgłoszenia (ochrona przed IDOR – `403`).
 - `author_id` i rola biorą się z sesji, nie z formularza (rejestracja zawsze tworzy `user`).
-- Sesja: ciasteczko `HttpOnly`, `SameSite=Lax`, ważność 2 h, nowe ID po zalogowaniu (session fixation),
-  sesje w bazie (działają przy wielu instancjach), blokada konta przez admina działa natychmiast.
-- Brak nagłówka `X-Powered-By`, ogólne komunikaty błędów (szczegóły tylko w logach).
-- Kontener działa jako użytkownik `node` (nie root).
+- Kontener działa jako użytkownik `node` (nie root), bez npm/yarn w obrazie.
+
+**L7 – kod i konfiguracja** (`src/security.js`, `src/audit.js`)
+- Limity żądań: 300 / 15 min na IP dla całej aplikacji, 10 nieudanych logowań / 15 min na IP, 5 rejestracji / h na IP.
+- Blokada konta na 15 min po 5 nieudanych logowaniach (admin może ją zdjąć).
+- Ochrona CSRF: losowy token w sesji i ukryte pole `_csrf` w każdym formularzu POST.
+- Sesja: ciasteczko `__Host-…` (HTTPS), `HttpOnly`, `SameSite=Strict`; wygasa po 30 min bezczynności
+  i najpóźniej 8 h po zalogowaniu; nowe ID po zalogowaniu i zmianie hasła.
+- Zmiana hasła (min. 10 znaków, bez loginu) wylogowuje wszystkie inne sesje użytkownika.
+- Monitoring: dziennik zdarzeń `auth_events` (90 dni) + panel admina **Bezpieczeństwo**
+  (aktywne sesje z możliwością wylogowania, nieudane logowania, blokady). Zdarzenia trafiają też do logów (JSON).
+- Nagłówki (`helmet`): CSP bez skryptów i stylów inline, HSTS, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options`, COOP/COEP/CORP, `Referrer-Policy`, `Permissions-Policy`, `Cache-Control: no-store`.

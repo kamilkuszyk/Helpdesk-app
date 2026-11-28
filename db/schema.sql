@@ -51,3 +51,26 @@ CREATE TABLE IF NOT EXISTS session (
     expire TIMESTAMP(6) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session(expire);
+
+-- =====================================================================
+-- L7: zabezpieczenia logowania i monitoring
+-- =====================================================================
+
+-- Blokada konta po wielu nieudanych logowaniach + data ostatniego logowania
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until  TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+
+-- Dziennik zdarzeń bezpieczeństwa (logowania, blokady, sesje, odrzucone CSRF).
+-- Bez haseł i identyfikatorów sesji. Wpisy starsze niż 90 dni są usuwane (init-db.js).
+CREATE TABLE IF NOT EXISTS auth_events (
+    id         BIGSERIAL    PRIMARY KEY,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    event      VARCHAR(30)  NOT NULL,
+    user_id    INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+    username   VARCHAR(50),
+    ip         VARCHAR(64),
+    user_agent VARCHAR(200),
+    detail     VARCHAR(200)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_events_created ON auth_events(created_at);

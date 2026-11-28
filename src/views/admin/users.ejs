@@ -1,18 +1,21 @@
 <%- include('../partials/header') %>
 <h2>Użytkownicy</h2>
 <table>
-    <tr><th>#</th><th>Login</th><th>Zgłoszeń</th><th>Utworzono</th><th>Rola / aktywny</th></tr>
+    <tr><th>#</th><th>Login</th><th>Zgłoszeń</th><th>Utworzono</th><th>Ostatnie logowanie</th><th>Blokada</th><th>Rola / aktywny</th></tr>
     <% users.forEach(u => { %>
     <tr>
         <td><%= u.id %></td>
         <td><%= u.username %></td>
         <td><%= u.ticket_count %></td>
         <td><%= u.created_at.toLocaleDateString('pl-PL') %></td>
+        <td><%= u.last_login_at ? u.last_login_at.toLocaleString('pl-PL') : '-' %></td>
+        <td><% if (u.is_locked) { %><span class="warn">do <%= u.locked_until.toLocaleTimeString('pl-PL') %></span><% } else { %>-<% } %></td>
         <td>
             <% if (u.id === user.id) { %>
                 <%= LABELS[u.role] %> (Twoje konto)
             <% } else { %>
             <form method="post" action="/admin/users/<%= u.id %>">
+                <%- include('../partials/csrf') %>
                 <select name="role">
                     <% ROLES.forEach(r => { %>
                         <option value="<%= r %>" <%= r === u.role ? 'selected' : '' %>><%= LABELS[r] %></option>
@@ -26,4 +29,5 @@
     </tr>
     <% }) %>
 </table>
+<p class="muted">Zapisanie użytkownika zdejmuje też czasową blokadę po nieudanych logowaniach.</p>
 <%- include('../partials/footer') %>

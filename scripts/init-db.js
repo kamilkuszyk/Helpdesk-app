@@ -59,6 +59,9 @@ async function main() {
         const schema = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
         await client.query(schema);
 
+        // Dziennik bezpieczeństwa przechowujemy 90 dni (minimalizacja danych - RODO)
+        await client.query("DELETE FROM auth_events WHERE created_at < now() - interval '90 days'");
+
         const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM users');
         if (rows[0].n === 0 && process.env.SEED_DEMO_DATA !== 'false') {
             await client.query('BEGIN');

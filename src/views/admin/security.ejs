@@ -1,0 +1,56 @@
+<%- include('../partials/header') %>
+<h2>Bezpieczeństwo</h2>
+
+<h3>Ostatnie 24 godziny</h3>
+<table class="stats">
+    <tr><th>Nieudane logowania</th><th>Zablokowane konta</th><th>Przekroczone limity żądań</th><th>Odrzucone formularze (CSRF)</th></tr>
+    <tr><td><%= stats.failed %></td><td><%= stats.locked %></td><td><%= stats.rate_limited %></td><td><%= stats.csrf %></td></tr>
+</table>
+
+<% if (lockedUsers.length) { %>
+<p class="warn">Zablokowane teraz konta:
+    <% lockedUsers.forEach(u => { %><%= u.username %> (do <%= u.locked_until.toLocaleTimeString('pl-PL') %>) <% }) %>
+    - odblokujesz je w zakładce <a href="/admin/users">Użytkownicy</a>.
+</p>
+<% } %>
+
+<h3>Aktywne sesje (<%= sessions.length %>)</h3>
+<table>
+    <tr><th>Użytkownik</th><th>Adres IP</th><th>Przeglądarka</th><th>Zalogowano</th><th>Ostatnia aktywność</th><th>Wygasa</th><th></th></tr>
+    <% sessions.forEach(s => { %>
+    <tr>
+        <td><%= s.username %> <span class="muted">(<%= LABELS[s.role] %>)</span></td>
+        <td><%= s.ip || '-' %></td>
+        <td class="muted"><%= (s.ua || '-').slice(0, 60) %></td>
+        <td><%= s.login_at ? s.login_at.toLocaleString('pl-PL') : '-' %></td>
+        <td><%= s.last_seen ? s.last_seen.toLocaleString('pl-PL') : '-' %></td>
+        <td><%= s.expire.toLocaleTimeString('pl-PL') %></td>
+        <td>
+            <% if (s.id === currentSessionId) { %>
+                <em>to Ty</em>
+            <% } else { %>
+            <form method="post" action="/admin/sessions/<%= s.id %>/revoke" class="inline">
+                <%- include('../partials/csrf') %>
+                <button>Wyloguj</button>
+            </form>
+            <% } %>
+        </td>
+    </tr>
+    <% }) %>
+</table>
+<p class="muted">Sesja wygasa po 30 minutach bezczynności i najpóźniej 8 godzin po zalogowaniu.</p>
+
+<h3>Dziennik zdarzeń (ostatnie 50)</h3>
+<table>
+    <tr><th>Czas</th><th>Zdarzenie</th><th>Użytkownik</th><th>Adres IP</th><th>Szczegóły</th></tr>
+    <% events.forEach(e => { %>
+    <tr>
+        <td><%= e.created_at.toLocaleString('pl-PL') %></td>
+        <td class="<%= ['login_failed','login_blocked','account_locked','rate_limited','csrf_rejected'].includes(e.event) ? 'warn' : '' %>"><%= e.event %></td>
+        <td><%= e.username || '-' %></td>
+        <td><%= e.ip || '-' %></td>
+        <td class="muted"><%= e.detail || '' %></td>
+    </tr>
+    <% }) %>
+</table>
+<%- include('../partials/footer') %>

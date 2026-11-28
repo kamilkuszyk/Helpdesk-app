@@ -8,12 +8,13 @@
     Utworzono: <%= ticket.created_at.toLocaleString('pl-PL') %>
 </p>
 <%# Znacznik EJS ze znakiem "=" zamienia znaki specjalne HTML na encje (ochrona przed XSS) %>
-<p style="white-space: pre-wrap"><%= ticket.description %></p>
+<p class="pre"><%= ticket.description %></p>
 
 <% if (user.role !== 'user') { %>
 <fieldset>
     <legend>Obsługa zgłoszenia (support)</legend>
     <form method="post" action="/tickets/<%= ticket.id %>/update">
+        <%- include('../partials/csrf') %>
         Status:
         <select name="status">
             <% STATUSES.forEach(s => { %>
@@ -42,12 +43,13 @@
 <% comments.forEach(c => { %>
     <div class="comment">
         <small><strong><%= c.username %></strong> (<%= LABELS[c.role] %>), <%= c.created_at.toLocaleString('pl-PL') %></small>
-        <div style="white-space: pre-wrap"><%= c.body %></div>
+        <div class="pre"><%= c.body %></div>
     </div>
 <% }) %>
 
 <% if (ticket.status !== 'closed') { %>
 <form method="post" action="/tickets/<%= ticket.id %>/comments">
+    <%- include('../partials/csrf') %>
     <p><textarea name="body" rows="4" maxlength="2000" required></textarea></p>
     <button>Dodaj komentarz</button>
 </form>

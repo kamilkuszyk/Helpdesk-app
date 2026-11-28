@@ -1,0 +1,13 @@
+/* Style w osobnym pliku - Content-Security-Policy blokuje style wpisane w HTML */
+body { font-family: sans-serif; max-width: 1000px; margin: 20px auto; padding: 0 10px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; vertical-align: top; }
+.flash { background: #ffd; border: 1px solid #cc9; padding: 6px; }
+.error { color: #b00; }
+.comment { border-left: 3px solid #999; padding-left: 8px; margin: 8px 0; }
+textarea { width: 100%; }
+.inline { display: inline; }
+.pre { white-space: pre-wrap; }
+.muted { color: #666; font-size: 0.9em; }
+.warn { color: #b00; font-weight: bold; }
+.stats td { text-align: center; font-size: 1.2em; }

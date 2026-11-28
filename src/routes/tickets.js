@@ -107,7 +107,7 @@ router.get('/:id', async (req, res) => {
     const comments = await pool.query(
         `SELECT c.body, c.created_at, u.username, u.role
            FROM comments c JOIN users u ON u.id = c.author_id
-          WHERE c.ticket_id = $1 ORDER BY c.created_at`,
+          WHERE c.ticket_id = $1 ORDER BY c.created_at, c.id`,
         [ticket.id]
     );
     let staff = [];
